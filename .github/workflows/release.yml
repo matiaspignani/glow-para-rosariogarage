@@ -1,0 +1,132 @@
+name: Release
+
+# Fully automatic: every push to main that changes the extension is released when its commits
+# warrant it (feat -> minor, fix/perf/refactor -> patch; see tools/next-version.mjs).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - manifest.json
+      - content.js
+      - content.css
+      - early.js
+      - popup.html
+      - popup.js
+      - icons/**
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Compute the version, build and validate the zip only; do not publish"
+        type: boolean
+        default: true
+      republish:
+        description: "Re-upload the version already in manifest.json (use after a failed publish)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Only a manual run with dry_run left on skips publishing. Pushes to main always publish.
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      REPUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.republish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the version is derived from the commits since the last tag
+
+      - name: Decide the version
+        id: next
+        run: |
+          if [ "$REPUBLISH" = "true" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(node -p "require('./manifest.json').version")" >> "$GITHUB_OUTPUT"
+          else
+            node tools/next-version.mjs
+          fi
+
+      - name: Nothing to release
+        if: steps.next.outputs.release != 'true'
+        run: echo "No releasable commits (feat/fix/perf/refactor) since the last tag."
+
+      - name: Require Chrome Web Store secrets before tagging
+        if: steps.next.outputs.release == 'true' && env.DRY_RUN != 'true'
+        env:
+          CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          # Fail before the tag is pushed, so a missing secret never burns a version number.
+          if [ -z "$CWS_SERVICE_ACCOUNT_JSON" ] || [ -z "$CWS_PUBLISHER_ID" ] || [ -z "$CWS_EXTENSION_ID" ]; then
+            echo "Set CWS_SERVICE_ACCOUNT_JSON, CWS_PUBLISHER_ID and CWS_EXTENSION_ID, then re-run this workflow." >&2
+            exit 1
+          fi
+
+      - name: Bump manifest, commit and tag
+        if: steps.next.outputs.release == 'true' && env.DRY_RUN != 'true' && env.REPUBLISH != 'true'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          node tools/next-version.mjs --write
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet manifest.json; then
+            git commit -m "chore: release $VERSION" manifest.json
+          fi
+          git tag "v$VERSION"
+          # Pushed before publishing so the version is reserved even if the store step fails.
+          git push origin HEAD:main "v$VERSION"
+
+      - name: Build the extension zip
+        if: steps.next.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          # In a dry run the manifest still holds the old version: build with the computed one.
+          node -e "const f=require('fs');const m=JSON.parse(f.readFileSync('manifest.json'));m.version=process.env.VERSION;f.writeFileSync('manifest.json',JSON.stringify(m,null,2)+'\n')"
+          mkdir -p dist
+          ZIP="dist/glow-para-rosariogarage-$VERSION.zip"
+          rm -f "$ZIP"
+          zip -r -X "$ZIP" manifest.json early.js content.js content.css popup.html popup.js icons
+          unzip -Z1 "$ZIP" | grep -qx 'manifest.json' || { echo "manifest.json is not at the zip root" >&2; exit 1; }
+          unzip -l "$ZIP"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Check Chrome Web Store credentials (read-only)
+        if: steps.next.outputs.release == 'true' && env.DRY_RUN == 'true'
+        env:
+          CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          if [ -z "$CWS_SERVICE_ACCOUNT_JSON" ] || [ -z "$CWS_PUBLISHER_ID" ] || [ -z "$CWS_EXTENSION_ID" ]; then
+            echo "CWS secrets are not set; skipping the credentials check."
+          else
+            node tools/cws-publish.mjs --check
+          fi
+
+      - name: Publish to the Chrome Web Store
+        if: steps.next.outputs.release == 'true' && env.DRY_RUN != 'true'
+        env:
+          CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: node tools/cws-publish.mjs "$ZIP"
+
+      - name: Create GitHub Release
+        if: steps.next.outputs.release == 'true' && env.DRY_RUN != 'true' && env.REPUBLISH != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: gh release create "v$VERSION" "$ZIP" --title "v$VERSION" --generate-notes --verify-tag
