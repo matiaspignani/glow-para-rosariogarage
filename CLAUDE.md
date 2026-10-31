@@ -20,6 +20,10 @@ Sincronizado: `rgFav:<id>` (una clave por favorito, tope 150) y `rgOff` (mejoras
 ## Cómo probar
 `node tools/e2e.mjs <carpetaExtension> <carpetaSalida>` — Edge sin pantalla con la extensión real sobre el sitio en vivo (Node 22+). Chrome 137+ de marca ya no acepta `--load-extension`.
 
+## Pendiente (manual, una sola vez)
+1. Subir a mano el primer zip a la Chrome Web Store y completar la ficha (`store/LISTING.md`); pegar la política https://matiaspignani.github.io/glow-para-rosariogarage/ (desde `docs/index.html`, copia de `store/privacy.html`; mantenerlas iguales).
+2. Cargar los secretos `CWS_SERVICE_ACCOUNT_JSON`, `CWS_PUBLISHER_ID` y `CWS_EXTENSION_ID` en el repo (los dos primeros son los mismos que en Promiedos) y volver a correr el workflow Release. Detalles en `RELEASING.md`.
+
 ## Convenciones
 - Artefactos (código, comentarios, commits) en inglés; textos de interfaz en español rioplatense neutro.
 - Commits convencionales (definen la versión: `feat` menor, `fix` parche). Sin "Co-Authored-By" ni atribución de IA.

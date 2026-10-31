@@ -40,7 +40,8 @@ Estos pasos los tiene que hacer una persona una sola vez, porque dependen de cue
    | `CWS_PUBLISHER_ID` | Developer Dashboard → Publisher → Settings |
    | `CWS_EXTENSION_ID` | ID de la extensión **nueva** (en la URL de su ficha) |
 
-4. **Permisos del workflow.** Settings → Actions → General → Workflow permissions: *Read and write*. Si `main` tiene protección de rama, el bot necesita poder pushear el commit de versión.
+4. **Permisos del workflow.** No hace falta tocar nada: el workflow declara `contents: write` por sí mismo (igual que en Promiedos, con el ajuste del repo en *Read*). Si algún día `main` tiene protección de rama, el bot necesita poder pushear el commit de versión.
+5. **Política de privacidad.** Se publica sola en https://matiaspignani.github.io/glow-para-rosariogarage/ (desde `docs/index.html`, copia de `store/privacy.html`; mantenerlas iguales). Pegar esa URL en la pestaña Privacidad de la tienda.
 
 ## Notas
 
