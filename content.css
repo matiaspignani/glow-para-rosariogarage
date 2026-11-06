@@ -11,6 +11,18 @@ html:not([data-rg-off~="ads"]) {
   position: relative;
 }
 
+.rg-conv {
+  margin-left: 6px;
+  font-size: 0.65em;
+  font-weight: 400;
+  color: #a8a8a8;
+  white-space: nowrap;
+}
+
+html[data-rg-off~="conv"] .rg-conv {
+  display: none;
+}
+
 .rg-heart {
   position: absolute;
   top: 8px;
@@ -87,6 +99,16 @@ html:not([data-rg-off~="seen"]) {
 
   & input {
     accent-color: #ff8a1f;
+  }
+}
+
+.rg-bar .rg-note {
+  margin-left: auto;
+  color: #a8a8a8;
+  font-size: 12px;
+
+  &:empty {
+    display: none;
   }
 }
 

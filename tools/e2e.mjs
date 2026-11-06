@@ -84,7 +84,8 @@ async function main() {
 
   await ev(`document.querySelector('.rg-heart').click()`);
   await sleep(500);
-  check("heart toggles on", await ev(`document.querySelectorAll('.rg-heart.rg-on').length === 1`));
+  const on = await ev(`document.querySelectorAll('.rg-heart.rg-on').length`);
+  check("heart toggles on", on === 1, `(${on})`);
   check("favorites counter", (await ev(`document.getElementById('rg-host').shadowRoot.querySelector('.fab').textContent`)).includes("1"));
 
   await ev(`(() => { const s = document.querySelector('.rg-bar select'); s.value = 'yearDesc'; s.dispatchEvent(new Event('change')); })()`);
@@ -100,8 +101,16 @@ async function main() {
   check("hearts on agency page", agencyHearts > 10, `(${agencyHearts})`);
   check("sort bar on agency page", await ev(`!!document.querySelector('.rg-bar select')`));
   await ev(`(() => { const s = document.querySelector('.rg-bar select'); s.value = 'priceAsc'; s.dispatchEvent(new Event('change')); })()`);
-  const agencyPrices = await ev(`[...document.querySelector('.box-list').children].filter(u => u.querySelector('[data-rel]')).map(u => u.querySelector('.precio')?.textContent || '').filter(t => /^\\s*\\$/.test(t)).map(t => Number(t.replace(/[^\\d]/g, '')))`);
-  check("agency sorted by price", agencyPrices.length > 10 && agencyPrices.every((p, i) => i === 0 || agencyPrices[i - 1] <= p), `(${agencyPrices.slice(0, 4)})`);
+  const rateInfo = await ev(`document.querySelector('.rg-bar').dataset.rate || ''`);
+  check("official dollar rate loaded", Number(rateInfo) > 100, `(${rateInfo})`);
+  // Dollar prices are compared after conversion at the official rate.
+  const agencyPrices = await ev(`(() => { const rate = Number(document.querySelector('.rg-bar').dataset.rate); return [...document.querySelector('.box-list').children].filter(u => u.querySelector('[data-rel]')).map(u => u.querySelector('.precio')?.dataset.rgPrice || '').filter(t => /\\d/.test(t)).map(t => Number(t.replace(/[^\\d]/g, '')) * (/U\\$S/.test(t) ? rate : 1)); })()`);
+  check("agency sorted by price (USD converted)", agencyPrices.length > 10 && agencyPrices.every((p, i) => i === 0 || agencyPrices[i - 1] <= p), `(${agencyPrices.slice(0, 4)})`);
+  check("dollar listings are interleaved", await ev(`(() => { const t = [...document.querySelector('.box-list').children].filter(u => u.querySelector('[data-rel]')).map(u => u.querySelector('.precio')?.dataset.rgPrice || ''); const last = t.map((x, i) => (/\\$/.test(x) && !/U\\$S/.test(x) ? i : -1)).reduce((a, b) => Math.max(a, b), -1); return t.some((x, i) => /U\\$S/.test(x) && i < last); })()`));
+  const conv = await ev(`(() => { const rate = Number(document.querySelector('.rg-bar').dataset.rate); const num = (s) => Number(s.replace(/[^\\d]/g, '')); const rows = [...document.querySelectorAll('.box-list [data-rel] .precio')].map(el => ({ raw: el.dataset.rgPrice, conv: el.querySelector('.rg-conv')?.textContent || '' })); const peso = rows.find(r => /^\\$/.test(r.raw)); const usd = rows.find(r => /^U\\$S/.test(r.raw)); return { total: rows.length, withConv: rows.filter(r => r.conv).length, pesoOk: !!peso && peso.conv === '(U$S ' + Math.round(num(peso.raw) / rate).toLocaleString('es-AR') + ')', usdOk: !usd || usd.conv === '($ ' + Math.round(num(usd.raw) * rate).toLocaleString('es-AR') + ')', sample: [peso, usd] }; })()`);
+  check("every price has its conversion", conv.total > 10 && conv.withConv === conv.total, `(${conv.withConv}/${conv.total})`);
+  check("pesos -> USD divides by the official rate", conv.pesoOk, JSON.stringify(conv.sample[0]));
+  check("USD -> pesos multiplies by the official rate", conv.usdOk, JSON.stringify(conv.sample[1]));
   check("contact panel stays first", await ev(`!document.querySelector('.box-list').firstElementChild.querySelector('[data-rel]')`));
   await ev(`document.querySelector('.rg-heart').click()`);
   await sleep(300);
@@ -111,6 +120,7 @@ async function main() {
   await go(`${BASE}/index.php?action=carro/showProduct&itmId=5861031&rbrId=107`);
   const bar = await ev(`(() => { const b = document.getElementById('rg-host')?.shadowRoot.querySelector('.bar'); return b ? { shown: b.classList.contains('show'), text: b.textContent, wa: b.querySelector('a')?.href } : null; })()`);
   check("contact bar built", Boolean(bar && bar.text.includes("$")), JSON.stringify(bar && bar.text.slice(0, 60)));
+  check("conversion in the contact bar", Boolean(bar && /\(U\$S [\d.]+\)/.test(bar.text)), JSON.stringify(bar && bar.text.slice(0, 80)));
   check("whatsapp link", Boolean(bar?.wa?.startsWith("https://wa.me/")));
   await shot("detail");
 

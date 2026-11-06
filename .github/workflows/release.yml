@@ -8,6 +8,7 @@ on:
       - main
     paths:
       - manifest.json
+      - background.js
       - content.js
       - content.css
       - early.js
@@ -98,7 +99,7 @@ jobs:
           mkdir -p dist
           ZIP="dist/glow-para-rosariogarage-$VERSION.zip"
           rm -f "$ZIP"
-          zip -r -X "$ZIP" manifest.json early.js content.js content.css popup.html popup.js icons
+          zip -r -X "$ZIP" manifest.json background.js early.js content.js content.css popup.html popup.js icons
           unzip -Z1 "$ZIP" | grep -qx 'manifest.json' || { echo "manifest.json is not at the zip root" >&2; exit 1; }
           unzip -l "$ZIP"
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"

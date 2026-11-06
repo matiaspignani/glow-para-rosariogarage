@@ -2,7 +2,8 @@ const FEATURES = [
   ["favs", "Favoritos", "Corazón en cada aviso y lista de guardados."],
   ["seen", "Avisos vistos", "Atenúa los que ya abriste y permite ocultarlos."],
   ["sort", "Ordenar el listado", "Por precio, año o kilometraje en la página actual."],
-  ["contact", "Barra de contacto", "Precio y WhatsApp siempre a mano en cada aviso."],
+  ["conv", "Conversión de precios", "Muestra cada precio también en la otra moneda, al dólar oficial."],
+  ["contact","Barra de contacto", "Precio y WhatsApp siempre a mano en cada aviso."],
   ["ads", "Ocultar banners", "Quita los banners publicitarios del sitio."],
 ];
 

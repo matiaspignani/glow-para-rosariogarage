@@ -28,9 +28,28 @@
   };
   const cardOf = (unit) => (unit.hasAttribute("data-rel") ? unit : unit.querySelector("[data-rel]"));
 
+  // The price as the site wrote it. Cached on first read, before a conversion label is appended
+  // to the same element, so parsing never sees our own text.
+  const rawPrice = (el) => {
+    if (!el) return "";
+    if (el.dataset.rgPrice === undefined) el.dataset.rgPrice = clean(el.textContent);
+    return el.dataset.rgPrice;
+  };
+  const isUsd = (price) => /U\$S|USD/i.test(price);
+  // Pesos -> dollars (divide by the official rate); dollars -> pesos (multiply by it).
+  const convert = (price) => {
+    const amount = Number(price.replace(/[^\d]/g, ""));
+    if (!rate || !amount) return "";
+    return isUsd(price)
+      ? `$ ${Math.round(amount * rate.venta).toLocaleString("es-AR")}`
+      : `U$S ${Math.round(amount / rate.venta).toLocaleString("es-AR")}`;
+  };
+  const detailPriceEl = () => [...document.querySelectorAll(".box-text")].find((e) => /^(U\$S|\$)\s*[\d.]+/.test(e.dataset.rgPrice || clean(e.textContent)));
+
   let favs = {}; // id -> { t: title, p: price, i: image path, r: rubro id, at: timestamp }
   let seen = {}; // id -> timestamp
   let prefs = { sort: "orig", hideSeen: false };
+  let rate = null; // { venta, fecha }: official USD rate, used to compare dollar and peso prices
 
   // ---------- storage ----------
   const store = {
@@ -76,7 +95,7 @@
       id,
       data: {
         t: clean(title && title.textContent),
-        p: clean((card.querySelector(".precio") || {}).textContent),
+        p: rawPrice(card.querySelector(".precio")),
         i: src.startsWith(ORIGIN) ? src.slice(ORIGIN.length) : "",
         r: link ? new URL(link.href, ORIGIN).searchParams.get("rbrId") || "" : "",
       },
@@ -84,14 +103,14 @@
   }
 
   function readDetail() {
-    const price = [...document.querySelectorAll(".box-text")].find((e) => /^(U\$S|\$)\s*[\d.]+/.test(clean(e.textContent)));
+    const price = detailPriceEl();
     const photo = document.querySelector('img[src*="uploads_files"]');
     const src = (photo && photo.src) || "";
     return {
       id: DETAIL_ID,
       data: {
         t: clean((document.querySelector("h1") || {}).textContent) || clean(document.title),
-        p: price ? clean(price.textContent) : "",
+        p: price ? rawPrice(price) : "",
         i: src.startsWith(ORIGIN) ? src.slice(ORIGIN.length) : "",
         r: params.get("rbrId") || "",
       },
@@ -163,13 +182,14 @@
 
   function numbers(card) {
     const tit = clean((card.querySelector(".box_aviso_tit, .box_aviso_premium_tit") || {}).textContent);
-    const price = clean((card.querySelector(".precio") || {}).textContent);
+    const price = rawPrice(card.querySelector(".precio"));
     const year = tit.match(/\b(19|20)\d{2}\b/);
     const km = tit.match(/([\d.]+)\s*km/i);
     const amount = price.replace(/[^\d]/g, "");
+    const usd = isUsd(price);
     return {
-      // USD listings sort after every peso listing: the two are not comparable without a rate.
-      price: amount ? (/U\$S|USD/i.test(price) ? 1e12 : 0) + Number(amount) : null,
+      // Dollar prices are converted at the official rate; without a rate they sort after every peso price.
+      price: amount ? (usd ? (rate ? Number(amount) * rate.venta : 1e12 + Number(amount)) : Number(amount)) : null,
       year: year ? Number(year[0]) : null,
       km: km ? Number(km[1].replace(/\./g, "")) : null,
     };
@@ -229,7 +249,10 @@
     });
     seenLabel.append(box, "Ocultar avisos vistos");
 
-    bar.append(sortLabel, seenLabel);
+    const note = document.createElement("span");
+    note.className = "rg-note";
+    note.dataset.rgSort = "";
+    bar.append(sortLabel, seenLabel, note);
     anchor.parentNode.insertBefore(bar, anchor);
   }
 
@@ -261,6 +284,8 @@
     .bar.show { display: flex; }
     .bar .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
     .bar .p { font-size: 18px; font-weight: 800; color: #ff8a1f; white-space: nowrap; }
+    .bar .c { margin-left: 6px; font-size: 12px; font-weight: 400; color: #a8a8a8; }
+    :host-context(html[data-rg-off~="conv"]) .bar .c { display: none; }
     .bar a, .bar button { padding: 9px 14px; border: 0; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer; }
     .bar a { background: #25d366; color: #0b2b14; }
     .bar button { background: #333; color: #fff; }
@@ -361,6 +386,10 @@
     const p = document.createElement("div");
     p.className = "p";
     p.textContent = data.p;
+    const conv = document.createElement("small");
+    conv.className = "c";
+    p.append(conv);
+    ui.barConv = conv;
     ui.bar.append(t, p);
     if (wa && /^https:\/\/(wa\.me|api\.whatsapp\.com)\//.test(wa.href)) {
       const link = document.createElement("a");
@@ -385,6 +414,51 @@
     }
   }
 
+  function showRate() {
+    const bar = document.querySelector(".rg-bar");
+    if (!bar || !rate) return;
+    bar.dataset.rate = String(rate.venta);
+    const note = bar.querySelector(".rg-note");
+    const when = rate.fecha ? ` (${rate.fecha.split("-").reverse().join("/")})` : "";
+    note.textContent = `U$S convertidos a $${rate.venta.toLocaleString("es-AR")}, dólar oficial${when}`;
+  }
+
+  // Appends "(U$S x)" or "($ x)" next to every price: the same amount in the other currency.
+  function applyConversions() {
+    const els = [...document.querySelectorAll(".box-list [data-rel] .precio")];
+    const detail = DETAIL_ID && detailPriceEl();
+    if (detail) els.push(detail);
+    for (const el of els) {
+      const label = convert(rawPrice(el));
+      let span = el.querySelector(":scope > .rg-conv");
+      if (!label) {
+        if (span) span.remove();
+        continue;
+      }
+      if (!span) {
+        span = document.createElement("span");
+        span.className = "rg-conv";
+        el.append(span);
+      }
+      span.textContent = `(${label})`;
+    }
+    if (ui && ui.barConv) ui.barConv.textContent = detail ? `(${convert(rawPrice(detail))})` : "";
+  }
+
+  function loadRate() {
+    try {
+      chrome.runtime.sendMessage({ type: "rg-rate" }, (res) => {
+        if (chrome.runtime.lastError || !res || !Number.isFinite(res.venta)) return;
+        rate = { venta: res.venta, fecha: typeof res.fecha === "string" ? res.fecha : "" };
+        showRate();
+        applyConversions();
+        applySort();
+      });
+    } catch {
+      /* extension context gone: dollar listings simply sort last */
+    }
+  }
+
   // ---------- refresh / scan ----------
   function refresh() {
     root.classList.toggle("rg-hide-seen", prefs.hideSeen);
@@ -401,6 +475,8 @@
       if (isId(card.getAttribute("data-rel"))) addHeart(card);
     }
     ensureBar();
+    showRate();
+    applyConversions();
     applySort();
     refresh();
   }
@@ -412,6 +488,7 @@
       markSeen(DETAIL_ID);
     }
     scan();
+    loadRate();
     document.addEventListener("click", onOpen, true);
     document.addEventListener("auxclick", onOpen, true);
 

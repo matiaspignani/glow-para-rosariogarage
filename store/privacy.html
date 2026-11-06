@@ -31,6 +31,7 @@
   <ul>
     <li>tus <strong>favoritos</strong>: el título, el precio, la miniatura y el número de cada aviso que guardás;</li>
     <li>los <strong>avisos que abriste</strong>, para mostrarlos atenuados;</li>
+    <li>la última cotización del dólar oficial consultada y su fecha;</li></li>
     <li>tus preferencias: qué mejoras están activas, el orden elegido y si ocultás los avisos vistos.</li>
   </ul>
   <p>No recopilamos nombre, correo, historial de navegación, ubicación ni ningún dato personal. No hay cuentas propias, servidores propios, analíticas ni publicidad de terceros.</p>
@@ -43,12 +44,14 @@
   <p>Los desarrolladores de esta extensión <strong>no tienen acceso</strong> a esos datos.</p>
 
   <h2>Conexiones de red</h2>
-  <p>La extensión <strong>no hace ninguna conexión de red propia</strong>. Lee el contenido de las páginas de rosariogarage.com que visitás solo para mostrarlo de otra forma en tu pantalla; esa información no sale de tu navegador. Las miniaturas de tus favoritos las carga el navegador desde rosariogarage.com, igual que lo hace el propio sitio. El botón de WhatsApp es un enlace que ya existe en el aviso: no se contacta a WhatsApp hasta que hacés clic.</p>
+  <p>La extensión hace <strong>una sola conexión de red</strong>: para convertir precios entre pesos y dólares consulta la cotización del dólar oficial a <code>dolarapi.com</code> (<code>https://dolarapi.com/v1/dolares/oficial</code>), como máximo una vez cada 6 horas. Es una consulta pública sin parámetros: <strong>no se envía ningún dato tuyo, de los avisos ni de tu navegación</strong>. Como en cualquier pedido a un sitio web, ese servicio ve tu dirección IP y se rige por su propia política. La cotización se guarda en tu navegador. Podés apagar la función desde el ícono de la extensión («Conversión de precios»), aunque la consulta sigue siendo necesaria para ordenar por precio mezclando pesos y dólares.</p>
+  <p>Fuera de eso, la extensión lee el contenido de las páginas de rosariogarage.com que visitás solo para mostrarlo de otra forma en tu pantalla; esa información no sale de tu navegador. Las miniaturas de tus favoritos las carga el navegador desde rosariogarage.com, igual que lo hace el propio sitio. El botón de WhatsApp es un enlace que ya existe en el aviso: no se contacta a WhatsApp hasta que hacés clic.</p>
 
   <h2>Permisos</h2>
   <ul>
     <li><code>storage</code>: guardar tus favoritos y preferencias.</li>
-    <li>Ejecución en <code>rosariogarage.com</code>: aplicar las mejoras sobre ese sitio. No se piden permisos de acceso a otros sitios.</li>
+    <li>Ejecución en <code>rosariogarage.com</code>: aplicar las mejoras sobre ese sitio.</li>
+    <li>Acceso a <code>dolarapi.com</code>: traer la cotización del dólar oficial.</li>
   </ul>
 
   <h2>Tus controles</h2>

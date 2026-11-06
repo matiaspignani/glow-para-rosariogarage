@@ -15,7 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
-const PATHS = ["manifest.json", "content.js", "content.css", "early.js", "popup.html", "popup.js", "icons"];
+const PATHS = ["manifest.json", "background.js", "content.js", "content.css", "early.js", "popup.html", "popup.js", "icons"];
 const write = process.argv.includes("--write");
 
 const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
