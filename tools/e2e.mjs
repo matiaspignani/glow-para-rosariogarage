@@ -94,6 +94,19 @@ async function main() {
   await sleep(300);
   await shot("listing");
 
+  // Agency page: cards are wrapped in .grid-item inside a CSS grid
+  await go(`${BASE}/citroenajpc/`);
+  const agencyHearts = await ev(`document.querySelectorAll('.rg-heart').length`);
+  check("hearts on agency page", agencyHearts > 10, `(${agencyHearts})`);
+  check("sort bar on agency page", await ev(`!!document.querySelector('.rg-bar select')`));
+  await ev(`(() => { const s = document.querySelector('.rg-bar select'); s.value = 'priceAsc'; s.dispatchEvent(new Event('change')); })()`);
+  const agencyPrices = await ev(`[...document.querySelector('.box-list').children].filter(u => u.querySelector('[data-rel]')).map(u => u.querySelector('.precio')?.textContent || '').filter(t => /^\\s*\\$/.test(t)).map(t => Number(t.replace(/[^\\d]/g, '')))`);
+  check("agency sorted by price", agencyPrices.length > 10 && agencyPrices.every((p, i) => i === 0 || agencyPrices[i - 1] <= p), `(${agencyPrices.slice(0, 4)})`);
+  check("contact panel stays first", await ev(`!document.querySelector('.box-list').firstElementChild.querySelector('[data-rel]')`));
+  await ev(`document.querySelector('.rg-heart').click()`);
+  await sleep(300);
+  await shot("agency");
+
   // Detail
   await go(`${BASE}/index.php?action=carro/showProduct&itmId=5861031&rbrId=107`);
   const bar = await ev(`(() => { const b = document.getElementById('rg-host')?.shadowRoot.querySelector('.bar'); return b ? { shown: b.classList.contains('show'), text: b.textContent, wa: b.querySelector('a')?.href } : null; })()`);

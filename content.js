@@ -18,6 +18,16 @@
   const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
   const isId = (v) => /^\d+$/.test(String(v));
 
+  // Listings are `[data-rel]` cards. In the main listing they are direct children of `.box-list`;
+  // on an agency page (/<agency>/) each one is wrapped in a `.grid-item`. The "unit" is the
+  // direct child of `.box-list` that holds the card: that is what gets sorted and hidden.
+  const unitOf = (card) => {
+    let u = card;
+    while (u.parentElement && !u.parentElement.classList.contains("box-list")) u = u.parentElement;
+    return u.parentElement ? u : card;
+  };
+  const cardOf = (unit) => (unit.hasAttribute("data-rel") ? unit : unit.querySelector("[data-rel]"));
+
   let favs = {}; // id -> { t: title, p: price, i: image path, r: rubro id, at: timestamp }
   let seen = {}; // id -> timestamp
   let prefs = { sort: "orig", hideSeen: false };
@@ -168,10 +178,11 @@
   function applySort() {
     const mode = MODES[prefs.sort] ? prefs.sort : "orig";
     for (const box of document.querySelectorAll(".box-list")) {
-      const cols = [...box.children].filter((c) => c.hasAttribute("data-rel"));
+      // Units without a card (e.g. the agency's contact panel) keep their place at the top.
+      const cols = [...box.children].filter((c) => cardOf(c));
       cols.forEach((c, i) => { if (!c.dataset.rgI) c.dataset.rgI = String(i); });
       const key = (c) => {
-        const n = numbers(c);
+        const n = numbers(cardOf(c));
         return mode === "priceAsc" || mode === "priceDesc" ? n.price : mode === "yearDesc" ? n.year : mode === "kmAsc" ? n.km : Number(c.dataset.rgI);
       };
       const dir = mode === "priceDesc" || mode === "yearDesc" ? -1 : 1;
@@ -378,7 +389,7 @@
   function refresh() {
     root.classList.toggle("rg-hide-seen", prefs.hideSeen);
     for (const btn of document.querySelectorAll(".rg-heart")) btn.classList.toggle("rg-on", Boolean(favs[btn.dataset.id]));
-    for (const card of document.querySelectorAll("[data-rel].rg-card")) card.classList.toggle("rg-seen", Boolean(seen[card.getAttribute("data-rel")]));
+    for (const card of document.querySelectorAll("[data-rel].rg-card")) unitOf(card).classList.toggle("rg-seen", Boolean(seen[card.getAttribute("data-rel")]));
     if (ui) {
       renderFavList();
       if (ui.barHeart) ui.barHeart.classList.toggle("on", Boolean(DETAIL_ID && favs[DETAIL_ID]));
@@ -386,7 +397,7 @@
   }
 
   function scan() {
-    for (const card of document.querySelectorAll(".box-list > [data-rel]:not(.rg-card)")) {
+    for (const card of document.querySelectorAll(".box-list [data-rel]:not(.rg-card)")) {
       if (isId(card.getAttribute("data-rel"))) addHeart(card);
     }
     ensureBar();
